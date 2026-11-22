@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.0 — 2026-11-22
+
+- Add username/password-only setup with automatic request signatures.
+- Discover supported hybrid inverters across account sites. Select a single inverter automatically or show a selection list.
+- Verify telemetry before creating an entry.
+- Preserve existing entry identity and polling interval when switching from manual authentication.
+- Retain compatibility with v0.4.0 configurations.
+- Verify real login, discovery and telemetry against the public demo account; add protocol and flow regression tests.
+
+Validation on the owner’s Home Assistant instance remains pending.
+
+
 ## 0.4.0 — 2026-11-22
 
 - Prepare a HACS-compatible repository and GitHub validation workflows.

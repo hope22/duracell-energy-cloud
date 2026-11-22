@@ -3,9 +3,10 @@
     "step": {
       "user": {
         "title": "Connect Duracell Energy Cloud",
-        "description": "Choose password login with API signatures, or an existing monitoring token. Automatic inverter discovery and signature generation are not supported.",
+        "description": "Enter your Duracell monitoring account credentials. Your sites and supported hybrid inverters will be discovered automatically.",
         "data": {
-          "auth_mode": "Authentication method"
+          "username": "Username",
+          "password": "Password"
         }
       },
       "details": {
@@ -21,12 +22,20 @@
           "login_sign": "Login request sign",
           "token": "Existing monitoring JWT (for testing only)"
         }
+      },
+      "select_inverter": {
+        "title": "Select your inverter",
+        "description": "Choose the inverter to connect. Add the integration again to connect another inverter.",
+        "data": {
+          "inverter_id": "Inverter"
+        }
       }
     },
     "error": {
-      "invalid_auth": "Monitoring authentication failed or the login response did not contain a recognised token. Verify login signature and credentials.",
-      "cannot_connect": "Could not read the selected inverter. Verify GroupAutoID, flowgraph signature and monitoring API availability.",
-      "missing_fields": "Inverter ID, GroupAutoID and flowgraph signature are required."
+      "invalid_auth": "Login failed. Check your username and password. If the portal requires a CAPTCHA, sign in there first before retrying.",
+      "cannot_connect": "Could not read your account or inverter. Check the monitoring portal and try again.",
+      "missing_fields": "Inverter ID, GroupAutoID and flowgraph signature are required.",
+      "no_inverters": "No supported hybrid inverters were found on this account."
     },
     "abort": {
       "already_configured": "This inverter is already configured.",

@@ -1,20 +1,23 @@
 # Configuration
 
-Use your own account at the Duracell monitoring portal. Connection values belong in the local Home Assistant setup form, never in GitHub issues.
+## New installations (v0.5.0+)
 
-In the browser developer tools, use the Network tab while logging in and viewing your inverter's power-flow screen. Inspect the requests without exporting or sharing a full HAR file.
+1. Open Settings → Devices & services → Add integration → Duracell Energy Cloud.
+2. Enter the username and password you use for the Duracell monitoring portal.
+3. If your account has one supported hybrid inverter, it is selected automatically. If it has several, select the site/inverter from the list.
 
-| Field | Source |
-| --- | --- |
-| Inverter ID | Exact inverter key in the `getGroupHybridFlowgraph_v1` JSON response |
-| GroupAutoID | `GroupAutoID` in that request's JSON body |
-| Flowgraph request sign | `sign` in that request's body |
-| Login request sign | `sign` in the `UserLogin_v1` request body; different from the flowgraph signature |
-| Username / password | Your monitoring account credentials |
-| Monitoring token | Raw Authorization header value used by the monitoring request, without a Bearer prefix |
+No serial number, group ID, signature or token needs to be copied. The integration signs requests, discovers your account's sites and validates inverter telemetry before saving the entry. To connect another inverter, add the integration again and choose it.
 
-Password mode attempts login and retries once after a rejected session. Token mode cannot automatically renew an expired token; Home Assistant will request reauthentication. Signatures may stop working if the provider changes its authentication scheme.
+The default polling interval is 120 seconds. Existing polling intervals are preserved during reconfiguration. This release's setup form only asks for credentials and, when necessary, an inverter selection.
 
-Polling defaults to 120 seconds and is constrained to 60–3600 seconds. Use the integration entry's **Reconfigure** action to change connection details or polling. Reconfiguration keeps the same inverter identity; add another entry for a different inverter.
+## Existing v0.4.0 entries
 
-Credentials are stored by Home Assistant in its local configuration storage. Protect configuration backups accordingly. Never commit configuration exports, HAR captures or account tokens.
+Existing manual password/signature and token entries continue to work after the update. To switch an existing entry to automatic login, use its **Reconfigure** action and enter your username and password. The same inverter must be present on the account; its entity identities and polling interval are retained. Old signatures and tokens are removed from that entry when switching.
+
+If authentication expires, Home Assistant requests reauthentication using username and password. Automatic mode renews a rejected monitoring session once before requesting user intervention.
+
+## Login problems
+
+Confirm you can log in at the provider's monitoring portal. If it requires a CAPTCHA, complete that in the portal before trying the integration again. No supported inverters means the account returned no hybrid devices; grid-only PV inverters are outside this integration's current scope.
+
+Credentials stay in Home Assistant's local configuration storage and are sent only to the monitoring API over HTTPS. Protect configuration backups. Never include passwords, tokens, signatures, account exports or HAR files in GitHub issues.

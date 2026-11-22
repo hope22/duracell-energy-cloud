@@ -30,7 +30,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         async_get_clientsession(hass),
         inverter_id=data[CONF_INVERTER_ID],
         group_id=data[CONF_GROUP_ID],
-        flow_sign=data[CONF_FLOW_SIGN],
+        flow_sign=data.get(CONF_FLOW_SIGN),
         auth_mode=data[CONF_AUTH_MODE],
         username=data.get(CONF_USERNAME),
         password=data.get(CONF_PASSWORD),

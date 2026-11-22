@@ -1,19 +1,30 @@
 """Read-only client for the observed Duracell / Senergytec monitoring API.
 
-Only calls the user's demonstrated login and hybrid-flowgraph endpoints.
+Uses the public portal login, site/device lists and hybrid-flowgraph endpoints.
 The provider's protocol is unofficial. Never log request bodies or auth headers.
 """
 
 from __future__ import annotations
 
 import asyncio
+import base64
 import math
 from collections.abc import Mapping
 from typing import Any
 
 from aiohttp import ClientError, ClientSession, ClientTimeout
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives.padding import PKCS7
 
-from .const import AUTH_PASSWORD, AUTH_TOKEN, FLOW_URL, LOGIN_URL
+from .const import (
+    AUTH_AUTO,
+    AUTH_PASSWORD,
+    AUTH_TOKEN,
+    DEVICES_URL,
+    FLOW_URL,
+    GROUPS_URL,
+    LOGIN_URL,
+)
 
 
 class DuracellAPIError(Exception):
@@ -72,8 +83,7 @@ def numeric_value(value: Any) -> float | None:
 def extract_login_token(raw: Any) -> str:
     """Read the JWT from a recognised login response structure.
 
-    The user has not yet captured the full monitoring login response schema.
-    These are the conventional variants used by related Senergytec services.
+    The portal returns a top-level token. Legacy wrapper variants are also accepted.
     """
     if not isinstance(raw, Mapping):
         raise DuracellAuthError("Login returned an unexpected JSON format")
@@ -100,16 +110,16 @@ class DuracellCloudClient:
         self,
         session: ClientSession,
         *,
-        inverter_id: str,
-        group_id: str,
-        flow_sign: str,
+        inverter_id: str = "",
+        group_id: str = "",
+        flow_sign: str | None = None,
         auth_mode: str,
         username: str | None = None,
         password: str | None = None,
         login_sign: str | None = None,
         token: str | None = None,
     ) -> None:
-        if auth_mode not in (AUTH_PASSWORD, AUTH_TOKEN):
+        if auth_mode not in (AUTH_AUTO, AUTH_PASSWORD, AUTH_TOKEN):
             raise ValueError("Unsupported authentication mode")
         self._session = session
         self._inverter_id = inverter_id
@@ -121,6 +131,7 @@ class DuracellCloudClient:
         self._login_sign = login_sign
         self._token = token.strip() if auth_mode == AUTH_TOKEN and token else None
         self._login_lock = asyncio.Lock()
+        self._member_id: str | None = None
 
     async def _post(
         self, url: str, body: dict[str, Any], token: str | None = None
@@ -158,18 +169,59 @@ class DuracellCloudClient:
             raise DuracellAPIError("Unable to contact the monitoring API") from exc
 
     async def _async_login(self) -> str:
-        if not (self._username and self._password and self._login_sign):
+        if not (self._username and self._password):
             raise DuracellAuthError("Monitoring login credentials are incomplete")
-        response = await self._post(
-            LOGIN_URL,
-            {
-                "MemberID": self._username,
-                "Password": self._password,
-                "type": "1",
-                "sign": self._login_sign,
-            },
+        payload = {"MemberID": self._username, "Password": self._password, "type": "1"}
+        payload["sign"] = self._login_sign or request_signature(payload)
+        response = await self._post(LOGIN_URL, payload)
+        if isinstance(response, Mapping) and response.get("status") not in (None, "ok"):
+            raise DuracellAuthError(
+                "Monitoring login was rejected; check credentials in the portal"
+            )
+        token = extract_login_token(response)
+        member_id = response.get("MemberAutoID")
+        self._member_id = str(member_id) if member_id is not None else None
+        return token
+
+    def select_inverter(self, inverter_id: str, group_id: str) -> None:
+        """Select a discovered device without another login."""
+        self._inverter_id = inverter_id
+        self._group_id = group_id
+
+    async def async_discover(self) -> list[dict[str, str]]:
+        """Enumerate only this account's groups and supported hybrid inverters."""
+        token = await self._ensure_token()
+        if not self._member_id:
+            raise DuracellAPIError("Login response omitted the account ID")
+        payload = {"MemberAutoID": self._member_id, "inputValue": ""}
+        groups = await self._post(
+            GROUPS_URL, {**payload, "sign": request_signature(payload)}, token
         )
-        return extract_login_token(response)
+        group_rows = response_rows(groups, "AllGroupList")
+        devices = {}
+        for group in group_rows:
+            if not isinstance(group, Mapping) or group.get("AutoID") is None:
+                raise DuracellAPIError("Site list contained an invalid site")
+            group_id = str(group["AutoID"])
+            payload = {"MemberAutoID": self._member_id, "GroupAutoID": group_id}
+            response = await self._post(
+                DEVICES_URL, {**payload, "sign": request_signature(payload)}, token
+            )
+            for row in response_rows(response, "AllInverterList"):
+                if not isinstance(row, Mapping):
+                    raise DuracellAPIError("Device list contained an invalid inverter")
+                if row.get("isHybrid") not in (True, 1, "1"):
+                    continue
+                serial = row.get("GoodsID")
+                if not isinstance(serial, str) or not serial.strip():
+                    raise DuracellAPIError("Device list omitted the inverter ID")
+                serial = serial.strip()
+                devices[serial] = {
+                    "inverter_id": serial,
+                    "group_id": group_id,
+                    "label": f"{group.get('GoodsTypeName') or 'Site'} — {serial}",
+                }
+        return list(devices.values())
 
     async def _ensure_token(self) -> str:
         if self._token:
@@ -184,7 +236,8 @@ class DuracellCloudClient:
     async def async_get_flow(self) -> dict[str, Any]:
         """Fetch inverter data; on rejection, re-login at most once."""
         token = await self._ensure_token()
-        payload = {"GroupAutoID": self._group_id, "sign": self._flow_sign}
+        payload = {"GroupAutoID": self._group_id}
+        payload["sign"] = self._flow_sign or request_signature(payload)
         try:
             return extract_inverter_data(
                 await self._post(FLOW_URL, payload, token), self._inverter_id
@@ -214,3 +267,37 @@ def battery_value(raw: Any, key: str) -> float | str | None:
     if key == "battery_activity":
         return "discharging" if value > 0 else "charging" if value < 0 else "idle"
     return None
+
+
+def request_signature(payload: Mapping[str, Any]) -> str:
+    """Match the portal's AES-CBC signature for scalar request parameters.
+
+    Key/IV are public protocol constants, not account credentials. See
+    docs/api-protocol.md for the observed portal implementation and test vectors.
+    """
+    key = b"05469137076236813460585715952089"
+    parts = []
+    for name in sorted(payload):
+        value = payload[name]
+        if value is None or value == "" or isinstance(value, bool):
+            continue
+        if not isinstance(value, str | int):
+            raise ValueError("Unsupported signature parameter type")
+        parts.append(f"{name}={value}")
+    plaintext = ("&".join(parts) + "&" + key.decode()).encode("utf-8")
+    padder = PKCS7(128).padder()
+    padded = padder.update(plaintext) + padder.finalize()
+    encryptor = Cipher(algorithms.AES(key), modes.CBC(b"5161557162012237")).encryptor()
+    return base64.b64encode(encryptor.update(padded) + encryptor.finalize()).decode(
+        "ascii"
+    )
+
+
+def response_rows(response: Any, key: str) -> list:
+    if _denotes_auth_failure(response):
+        raise DuracellAuthError("Monitoring API rejected authentication")
+    if not isinstance(response, Mapping) or not isinstance(response.get(key), list):
+        raise DuracellAPIError(
+            "Monitoring API returned an unexpected discovery response"
+        )
+    return response[key]

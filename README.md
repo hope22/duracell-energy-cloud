@@ -6,13 +6,15 @@ Unofficial, read-only Home Assistant integration for Duracell Energy cloud monit
 
 Monitor your battery, solar generation and home power from Home Assistant. One shared cloud request refreshes all sensors every two minutes by default.
 
-**v0.4.0:** available as a HACS custom repository. Live upgrade verification is still pending. The original v0.3.0 was reported working with a Dura-i G3 inverter and Dura16 batteries; other models are unverified.
+**v0.5.0:** username/password login with automatic inverter discovery. Live login, discovery and telemetry were verified against the provider’s public demo account; verification on the owner’s Home Assistant installation is still pending. The original v0.3.0 was reported working with a Dura-i G3 inverter and Dura16 batteries; other models are unverified.
 
 ## Features
 
 - Battery percentage, voltage and signed power.
 - Separate battery charging and discharging power, plus charging/discharging/idle status.
 - Solar DC power, home load, signed grid power, backup EPS and generator power.
+- Username/password setup, automatic signing and discovery across account sites.
+- Automatic selection of a single inverter or a choice when several are available.
 - Shared polling, bounded login renewal and Home Assistant reauthentication.
 - Configuration editing and diagnostics containing no raw cloud responses or credentials.
 - Existing v0.3.0 device and sensor identifiers retained.
@@ -31,7 +33,7 @@ For an existing manual installation, follow [the migration guide](docs/installat
 
 ## Setup limitations
 
-This version requires the inverter ID, group ID and flowgraph request signature. Password mode also needs a login signature; token mode needs a monitoring token. Username/password-only setup, signature generation and automatic inverter discovery are **not implemented**. Password login depends on the provider accepting the supplied signature.
+Enter your monitoring username and password. Setup discovers supported hybrid inverters automatically; no signatures, tokens or serial numbers need to be entered. Existing v0.4.0 manual configurations remain compatible and can switch through **Reconfigure**.
 
 No battery controls or charging schedule changes are sent. The API is unofficial and may change without notice. Data refreshes depend on the provider's own reporting cadence.
 

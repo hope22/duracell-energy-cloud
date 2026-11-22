@@ -1,8 +1,9 @@
 # Troubleshooting
 
 - **Integration not found:** confirm the directory is `custom_components/duracell_energy_cloud`, then restart Home Assistant and refresh the browser.
-- **Cannot connect:** check inverter ID, GroupAutoID and the flowgraph signature; confirm the portal is working. HTTP failures and malformed responses make sensors unavailable.
-- **Authentication failed:** replace an expired token through Home Assistant's reauthentication prompt, or check password and login signature. Login and flowgraph signatures are different.
+- **Cannot connect:** confirm the monitoring portal is working and retry. HTTP failures and malformed responses make sensors unavailable.
+- **Authentication failed:** verify your monitoring username/password in the portal. Complete any CAPTCHA there first. Reauthenticate or use Reconfigure to switch an old manual entry to automatic login.
+- **No supported inverters:** the account has no hybrid devices returned by the monitoring API.
 - **Readings do not change:** the cloud may report more slowly than the polling interval. Compare the portal and wait several cycles.
 - **Energy Dashboard cannot select a power sensor:** use a cumulative kWh helper as described in the energy guide.
 

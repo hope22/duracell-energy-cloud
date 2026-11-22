@@ -9,8 +9,8 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import DuracellAPIError, DuracellAuthError, DuracellCloudClient
 from .const import (
+    AUTH_AUTO,
     AUTH_PASSWORD,
-    AUTH_TOKEN,
     CONF_AUTH_MODE,
     CONF_FLOW_SIGN,
     CONF_GROUP_ID,
@@ -63,27 +63,112 @@ class DuracellCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     def __init__(self) -> None:
         self._mode = AUTH_PASSWORD
+        self._credentials = {}
+        self._devices = {}
+        self._client = None
 
     async def async_step_reauth(self, entry_data: dict):
-        self._mode = entry_data[CONF_AUTH_MODE]
-        return await self.async_step_details()
+        return await self.async_step_user()
 
     async def async_step_reconfigure(self, user_input: dict | None = None):
-        self._mode = self._get_reconfigure_entry().data[CONF_AUTH_MODE]
-        return await self.async_step_details(user_input)
+        return await self.async_step_user(user_input)
 
     async def async_step_user(self, user_input: dict | None = None):
+        errors = {}
         if user_input is not None:
-            self._mode = user_input[CONF_AUTH_MODE]
-            return await self.async_step_details()
+            self._credentials = {
+                CONF_AUTH_MODE: AUTH_AUTO,
+                CONF_USERNAME: user_input[CONF_USERNAME].strip(),
+                CONF_PASSWORD: user_input[CONF_PASSWORD],
+            }
+            self._client = DuracellCloudClient(
+                async_get_clientsession(self.hass),
+                auth_mode=AUTH_AUTO,
+                username=self._credentials[CONF_USERNAME],
+                password=self._credentials[CONF_PASSWORD],
+            )
+            try:
+                devices = await self._client.async_discover()
+            except DuracellAuthError:
+                errors["base"] = "invalid_auth"
+            except DuracellAPIError:
+                errors["base"] = "cannot_connect"
+            else:
+                self._devices = {d[CONF_INVERTER_ID]: d for d in devices}
+                if self.source in ("reauth", "reconfigure"):
+                    entry = (
+                        self._get_reauth_entry()
+                        if self.source == "reauth"
+                        else self._get_reconfigure_entry()
+                    )
+                    serial = entry.data[CONF_INVERTER_ID]
+                    if serial not in self._devices:
+                        return self.async_abort(reason="wrong_inverter")
+                    return await self.async_step_select_inverter(
+                        {CONF_INVERTER_ID: serial}
+                    )
+                if not devices:
+                    errors["base"] = "no_inverters"
+                elif len(devices) == 1:
+                    return await self.async_step_select_inverter(
+                        {CONF_INVERTER_ID: devices[0][CONF_INVERTER_ID]}
+                    )
+                else:
+                    return await self.async_step_select_inverter()
         return self.async_show_form(
             step_id="user",
+            errors=errors,
+            data_schema=vol.Schema(
+                {vol.Required(CONF_USERNAME): str, vol.Required(CONF_PASSWORD): _SECRET}
+            ),
+        )
+
+    async def async_step_select_inverter(self, user_input: dict | None = None):
+        errors = {}
+        if user_input is not None:
+            serial = user_input[CONF_INVERTER_ID]
+            if serial not in self._devices:
+                errors["base"] = "no_inverters"
+            else:
+                device = self._devices[serial]
+                self._client.select_inverter(serial, device[CONF_GROUP_ID])
+                try:
+                    await self._client.async_get_flow()
+                except DuracellAuthError:
+                    return await self.async_step_user()
+                except DuracellAPIError:
+                    errors["base"] = "cannot_connect"
+                else:
+                    data = {
+                        **self._credentials,
+                        CONF_INVERTER_ID: serial,
+                        CONF_GROUP_ID: device[CONF_GROUP_ID],
+                        CONF_POLL_SECONDS: DEFAULT_POLL_SECONDS,
+                    }
+                    await self.async_set_unique_id(serial)
+                    if self.source in ("reauth", "reconfigure"):
+                        entry = (
+                            self._get_reauth_entry()
+                            if self.source == "reauth"
+                            else self._get_reconfigure_entry()
+                        )
+                        data[CONF_POLL_SECONDS] = entry.data.get(
+                            CONF_POLL_SECONDS, DEFAULT_POLL_SECONDS
+                        )
+                        return self.async_update_reload_and_abort(entry, data=data)
+                    self._abort_if_unique_id_configured()
+                    return self.async_create_entry(
+                        title=f"Duracell {serial[-4:]}", data=data
+                    )
+        return self.async_show_form(
+            step_id="select_inverter",
+            errors=errors,
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_AUTH_MODE, default=AUTH_PASSWORD): vol.In(
+                    vol.Required(CONF_INVERTER_ID): vol.In(
                         {
-                            AUTH_PASSWORD: "Username and password + API signatures",
-                            AUTH_TOKEN: "Existing monitoring token",
+                            serial: device["label"]
+                            for serial, device in self._devices.items()
                         }
                     )
                 }
