@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.6.0 — 2026-11-22
+
+- Automatically add Battery energy charged and Battery energy discharged in kWh.
+- Make battery energy totals eligible for Energy Dashboard statistics without manual helpers.
+- Restore native totals across normal restarts/reloads, preserving full calculation precision.
+- Integrate unchanged power readings on successful polls; skip missing readings, failed polls and prolonged gaps.
+- Preserve existing entity identities and add the new sensors to the same device.
+- Add energy calculation, restoration, metadata and lifecycle regression tests.
+
+Totals are estimates starting at installation, not historical meter readings. They do not backfill outages, downtime or existing helper history.
+
+
 ## 0.5.0 — 2026-11-22
 
 - Add username/password-only setup with automatic request signatures.
