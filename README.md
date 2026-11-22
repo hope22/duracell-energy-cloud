@@ -6,7 +6,7 @@ Unofficial, read-only Home Assistant integration for Duracell Energy cloud monit
 
 Monitor your battery, solar generation and home power from Home Assistant. One shared cloud request refreshes all sensors every two minutes by default.
 
-**v0.4.0 release candidate:** prepared for HACS custom repositories. Live upgrade verification and GitHub validation are required before a stable release. The original v0.3.0 was reported working with a Dura-i G3 inverter and Dura16 batteries; other models are unverified.
+**v0.4.0:** available as a HACS custom repository. Live upgrade verification is still pending. The original v0.3.0 was reported working with a Dura-i G3 inverter and Dura16 batteries; other models are unverified.
 
 ## Features
 
@@ -27,7 +27,7 @@ Requires Home Assistant 2024.12 or newer and HACS. This repository is not yet in
 4. Open **Settings → Devices & services → Add integration** and search for **Duracell Energy Cloud**.
 5. Enter the connection details described in [Configuration](docs/configuration.md).
 
-These steps become available once the repository is published. For an existing manual installation, follow [the migration guide](docs/installation.md) first; do not delete the configured integration.
+For an existing manual installation, follow [the migration guide](docs/installation.md) first; do not delete the configured integration.
 
 ## Setup limitations
 
@@ -57,7 +57,7 @@ The API used here exposes power in watts, not cumulative energy in kWh. See [Ene
 
 ## Updates and support
 
-After publication, new tagged GitHub releases can be installed from HACS, followed by a Home Assistant restart. Pushing a commit alone is not the documented stable release process.
+New tagged GitHub releases can be installed from HACS, followed by a Home Assistant restart. Pushing a commit alone is not the documented stable release process.
 
 - [Installation and upgrades](docs/installation.md)
 - [Configuration](docs/configuration.md)

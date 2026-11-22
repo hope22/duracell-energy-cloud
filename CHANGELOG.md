@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.4.0 — Unreleased
+## 0.4.0 — 2026-11-22
 
 - Prepare a HACS-compatible repository and GitHub validation workflows.
 - Add separate battery charging power, discharging power and activity sensors.
