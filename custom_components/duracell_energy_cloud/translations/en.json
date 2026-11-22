@@ -1,0 +1,38 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect Duracell Energy Cloud",
+        "description": "Choose password login with API signatures, or an existing monitoring token. Automatic inverter discovery and signature generation are not supported.",
+        "data": {
+          "auth_mode": "Authentication method"
+        }
+      },
+      "details": {
+        "title": "Configure inverter monitoring",
+        "description": "Enter the inverter's serial/JSON key, GroupAutoID and the per-operation sign values observed in your own browser's Network tab. Login signature and flowgraph signature are different. This integration reads data only.",
+        "data": {
+          "inverter_id": "Inverter ID (JSON response key)",
+          "group_id": "GroupAutoID",
+          "flow_sign": "Flowgraph request sign",
+          "poll_seconds": "Polling interval in seconds (minimum 60)",
+          "username": "Monitoring account username",
+          "password": "Monitoring account password",
+          "login_sign": "Login request sign",
+          "token": "Existing monitoring JWT (for testing only)"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Monitoring authentication failed or the login response did not contain a recognised token. Verify login signature and credentials.",
+      "cannot_connect": "Could not read the selected inverter. Verify GroupAutoID, flowgraph signature and monitoring API availability.",
+      "missing_fields": "Inverter ID, GroupAutoID and flowgraph signature are required."
+    },
+    "abort": {
+      "already_configured": "This inverter is already configured.",
+      "wrong_inverter": "Use the same inverter ID as the existing integration.",
+      "reauth_successful": "Authentication updated.",
+      "reconfigure_successful": "Configuration updated."
+    }
+  }
+}

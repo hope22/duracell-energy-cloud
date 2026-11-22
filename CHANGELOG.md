@@ -1,0 +1,16 @@
+# Changelog
+
+## 0.4.0 — Unreleased
+
+- Prepare a HACS-compatible repository and GitHub validation workflows.
+- Add separate battery charging power, discharging power and activity sensors.
+- Add reauthentication and reconfiguration without replacing existing entities.
+- Normalize stored connection identifiers and signatures after validation.
+- Add allowlisted diagnostics; reject HTTP redirects for authenticated requests.
+- Document installation, migration, estimated energy helpers and release procedures.
+
+Based on recovered v0.3.0 source. This is not the unavailable v0.4.0 archive from the earlier chat. Live upgrade testing remains outstanding.
+
+## 0.3.0
+
+Initial privately installed monitoring integration with nine sensors and password/token authentication. Reported working on a Synology Home Assistant container with a Dura-i G3 and Dura16 installation.

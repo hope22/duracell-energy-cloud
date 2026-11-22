@@ -1,0 +1,17 @@
+{
+  "domain": "duracell_energy_cloud",
+  "name": "Duracell Energy Cloud (Unofficial)",
+  "categories": [
+    "energy.meters_monitoring"
+  ],
+  "codeowners": [
+    "@hope22"
+  ],
+  "config_flow": true,
+  "documentation": "https://github.com/hope22/duracell-energy-cloud",
+  "integration_type": "device",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/hope22/duracell-energy-cloud/issues",
+  "requirements": [],
+  "version": "0.4.0"
+}
