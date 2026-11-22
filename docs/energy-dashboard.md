@@ -27,4 +27,12 @@ Failed polls and invalid/missing battery-power values break the sampling interva
 
 You can keep using the old helpers to retain their existing history, or switch the Energy Dashboard to the new built-in sensors. Do not configure a second battery entry for the same physical battery using both sets of totals. Keep old helpers until you are satisfied with the change; new sensors do not inherit their historical totals.
 
-Solar and grid energy sensors are outside this update. Solar DC power is not a verified AC generation meter, and grid import/export direction remains unverified.
+## Solar and grid (v0.7.0)
+
+For Electricity grid, select **Grid energy imported** and **Grid energy exported**; the corresponding non-negative power sensors are **Grid import power** and **Grid export power**. The portal maps positive gridCurrpac to import and negative to export. Check the direction against your physical meter/portal before relying on totals, especially with unusual generator or CT configurations.
+
+For Solar panels, **Solar DC energy (estimated)** is available. It is derived from TotalDCpower and measures DC-side generation, before inverter conversion losses. It is not an AC generation or billing meter; the Energy Dashboard's balance may consequently include those losses. Separate AC-coupled solar on another inverter is not included.
+
+These new energy estimates use the same persistence and outage rules as the battery estimates. They do not backfill earlier history. Do not add overlapping site-level grid readings from multiple inverters as separate utility meters.
+
+Optional reported counters are disabled by default; see [monitoring details](monitoring.md) before choosing them instead of estimates.

@@ -141,7 +141,7 @@ def test_original_unique_ids_and_sensor_values():
             assert sensor.native_value == 55
         if description.key == "battery_charging_power":
             assert sensor.native_value == 100
-    assert len(SENSOR_TYPES) == 12
+    assert len(SENSOR_TYPES) == 14
 
 
 @pytest.mark.asyncio
@@ -163,6 +163,9 @@ async def test_diagnostics_omit_secrets_and_telemetry():
         "auth_mode": "token",
         "poll_seconds": 120,
         "last_update_success": True,
+        "details_available": False,
+        "last_successful_update": None,
+        "consecutive_failures": 0,
     }
 
 

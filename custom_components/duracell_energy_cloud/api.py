@@ -20,6 +20,7 @@ from .const import (
     AUTH_AUTO,
     AUTH_PASSWORD,
     AUTH_TOKEN,
+    DETAIL_URL,
     DEVICES_URL,
     FLOW_URL,
     GROUPS_URL,
@@ -205,7 +206,9 @@ class DuracellCloudClient:
             group_id = str(group["AutoID"])
             payload = {"MemberAutoID": self._member_id, "GroupAutoID": group_id}
             response = await self._post(
-                DEVICES_URL, {**payload, "sign": request_signature(payload)}, token
+                DEVICES_URL,
+                {**payload, "sign": request_signature(payload)},
+                token,
             )
             for row in response_rows(response, "AllInverterList"):
                 if not isinstance(row, Mapping):
@@ -222,6 +225,29 @@ class DuracellCloudClient:
                     "label": f"{group.get('GoodsTypeName') or 'Site'} — {serial}",
                 }
         return list(devices.values())
+
+    async def async_get_details(self) -> dict[str, Any]:
+        """Read optional monitoring details; never send control requests."""
+        token = await self._ensure_token()
+        if not self._member_id:
+            raise DuracellAPIError(
+                "Detailed monitoring requires password authentication"
+            )
+        payload = {"GoodsID": self._inverter_id, "MemberAutoID": self._member_id}
+        response = await self._post(
+            DETAIL_URL, {**payload, "sign": request_signature(payload)}, token
+        )
+        if _denotes_auth_failure(response):
+            raise DuracellAuthError("Monitoring API rejected authentication")
+        if (
+            not isinstance(response, Mapping)
+            or response.get("GoodsID") != self._inverter_id
+        ):
+            raise DuracellAPIError("Details response omitted the selected inverter")
+        # Store only sensor fields. Do not retain account metadata or raw payloads.
+        from .telemetry import DETAIL_FIELDS
+
+        return {key: response[key] for key in DETAIL_FIELDS if key in response}
 
     async def _ensure_token(self) -> str:
         if self._token:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
 from time import monotonic
 from typing import Any
 
@@ -23,14 +24,35 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .api import battery_value, numeric_value
 from .const import CONF_INVERTER_ID, DOMAIN
 from .coordinator import DuracellCoordinator
 from .energy import EnergyAccumulator
+from .telemetry import (
+    DETAIL_DEFINITIONS,
+    DETAIL_FIELDS,
+    ENERGY_SOURCES,
+    detail_value,
+    power_value,
+)
 
 SENSOR_TYPES: tuple[SensorEntityDescription, ...] = (
+    *(
+        SensorEntityDescription(
+            key=key,
+            name=name,
+            native_unit_of_measurement=UnitOfPower.WATT,
+            device_class=SensorDeviceClass.POWER,
+            state_class=SensorStateClass.MEASUREMENT,
+        )
+        for key, name in [
+            ("grid_import_power", "Grid import power"),
+            ("grid_export_power", "Grid export power"),
+        ]
+    ),
     SensorEntityDescription(
         key="battery_charging_power",
         name="Battery charging power",
@@ -124,6 +146,21 @@ SENSOR_TYPES: tuple[SensorEntityDescription, ...] = (
 
 
 ENERGY_TYPES = (
+    *(
+        SensorEntityDescription(
+            key=key,
+            name=name,
+            native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+            device_class=SensorDeviceClass.ENERGY,
+            state_class=SensorStateClass.TOTAL_INCREASING,
+            suggested_display_precision=3,
+        )
+        for key, name in [
+            ("grid_energy_imported", "Grid energy imported"),
+            ("grid_energy_exported", "Grid energy exported"),
+            ("solar_dc_energy", "Solar DC energy (estimated)"),
+        ]
+    ),
     SensorEntityDescription(
         key="battery_energy_charged",
         name="Battery energy charged",
@@ -142,6 +179,46 @@ ENERGY_TYPES = (
     ),
 )
 
+# Keep the existing battery entities first, including their stable unique IDs.
+ENERGY_TYPES = tuple(
+    sorted(
+        ENERGY_TYPES, key=lambda description: not description.key.startswith("battery_")
+    )
+)
+HEALTH_TYPES = (
+    SensorEntityDescription(
+        key="connection_status",
+        name="Connection status",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    SensorEntityDescription(
+        key="last_successful_update",
+        name="Last successful update",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    SensorEntityDescription(
+        key="consecutive_failures",
+        name="Consecutive failed updates",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+)
+
+
+DETAIL_TYPES = tuple(
+    SensorEntityDescription(
+        key=key,
+        name=name,
+        native_unit_of_measurement=unit,
+        device_class=kind,
+        state_class=SensorStateClass.TOTAL_INCREASING
+        if kind == "energy"
+        else SensorStateClass.MEASUREMENT,
+        entity_registry_enabled_default=kind != "energy",
+    )
+    for key, name, unit, kind, _, _ in DETAIL_DEFINITIONS
+)
+
 
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
@@ -151,7 +228,13 @@ async def async_setup_entry(
         [
             *(
                 DuracellSensor(coordinator, entry.data[CONF_INVERTER_ID], description)
-                for description in SENSOR_TYPES
+                for description in (*SENSOR_TYPES, *DETAIL_TYPES)
+            ),
+            *(
+                DuracellHealthSensor(
+                    coordinator, entry.data[CONF_INVERTER_ID], description
+                )
+                for description in HEALTH_TYPES
             ),
             *(
                 DuracellEnergySensor(
@@ -192,6 +275,12 @@ class DuracellSensor(CoordinatorEntity[DuracellCoordinator], SensorEntity):
 
     @property
     def native_value(self) -> float | str | None:
+        if self.entity_description.key in DETAIL_FIELDS:
+            return detail_value(
+                self.coordinator.data or {}, self.entity_description.key
+            )
+        if self.entity_description.key in ("grid_import_power", "grid_export_power"):
+            return power_value(self.coordinator.data or {}, self.entity_description.key)
         if self.entity_description.key.startswith("battery_"):
             return battery_value(
                 (self.coordinator.data or {}).get("Pbat"), self.entity_description.key
@@ -212,11 +301,7 @@ class DuracellEnergySensor(DuracellSensor, RestoreSensor):
         # Permit ordinary request latency, but never bridge a prolonged polling gap.
         interval = coordinator.update_interval.total_seconds()
         self._energy = EnergyAccumulator(max_gap_seconds=2 * interval + 20)
-        self._power_key = (
-            "battery_charging_power"
-            if description.key == "battery_energy_charged"
-            else "battery_discharging_power"
-        )
+        self._power_key = ENERGY_SOURCES[description.key]
 
     async def async_added_to_hass(self) -> None:
         # Restore the native kWh total before starting a new sampling interval.
@@ -233,7 +318,7 @@ class DuracellEnergySensor(DuracellSensor, RestoreSensor):
     def available(self) -> bool:
         return (
             super().available
-            and numeric_value((self.coordinator.data or {}).get("Pbat")) is not None
+            and power_value(self.coordinator.data or {}, self._power_key) is not None
         )
 
     @property
@@ -244,7 +329,7 @@ class DuracellEnergySensor(DuracellSensor, RestoreSensor):
     @callback
     def _sample_energy(self) -> None:
         power = (
-            battery_value((self.coordinator.data or {}).get("Pbat"), self._power_key)
+            power_value(self.coordinator.data or {}, self._power_key)
             if self.coordinator.last_update_success
             else None
         )
@@ -253,4 +338,26 @@ class DuracellEnergySensor(DuracellSensor, RestoreSensor):
     @callback
     def _handle_coordinator_update(self) -> None:
         self._sample_energy()
+        self.async_write_ha_state()
+
+
+class DuracellHealthSensor(DuracellSensor):
+    """Keep diagnostic state available through a cloud outage."""
+
+    @property
+    def available(self):
+        return True
+
+    @property
+    def native_value(self):
+        return getattr(self.coordinator, self.entity_description.key)
+
+    async def async_added_to_hass(self):
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            async_track_time_interval(self.hass, self._tick, timedelta(seconds=30))
+        )
+
+    @callback
+    def _tick(self, now):
         self.async_write_ha_state()

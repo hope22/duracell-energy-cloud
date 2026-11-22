@@ -1,0 +1,3 @@
+generate_dashboard:
+  name: Generate dashboard
+  description: Generate a ready-made native dashboard using your actual inverter entities. Copy the response into a new dashboard's raw configuration editor. Existing dashboards are not changed. Administrator access required.

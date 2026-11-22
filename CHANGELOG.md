@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.7.0 — 2026-11-22
+
+- Add grid import/export power and persistent energy estimates using the portal-verified sign convention.
+- Add persistent solar DC energy estimates with explicit DC/loss limitations.
+- Add a native dashboard generation action using actual entity IDs and one view per inverter.
+- Add cloud connectivity, status, last successful read and consecutive failed update diagnostics.
+- Fetch optional battery details independently, exposing temperature, health, capacity and BMS limits where available.
+- Add disabled-by-default reported energy counters without replacing existing estimates.
+- Preserve existing entity IDs and cumulative estimates.
+
+Details vary by inverter; missing data remains unknown. Dashboard generation returns configuration to paste into a new dashboard. No control commands are sent.
+
+
 ## 0.6.0 — 2026-11-22
 
 - Automatically add Battery energy charged and Battery energy discharged in kWh.

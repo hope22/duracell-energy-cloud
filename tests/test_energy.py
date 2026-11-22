@@ -182,6 +182,6 @@ async def test_setup_adds_two_energy_entities_without_helpers():
     added = MagicMock()
     await async_setup_entry(hass, entry, added)
     entities = added.call_args.args[0]
-    assert len(entities) == 14
-    assert len({e.unique_id for e in entities}) == 14
-    assert sum(isinstance(e, DuracellEnergySensor) for e in entities) == 2
+    assert len(entities) == 35
+    assert len({e.unique_id for e in entities}) == 35
+    assert sum(isinstance(e, DuracellEnergySensor) for e in entities) == 5

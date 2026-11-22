@@ -6,7 +6,7 @@
 2. Keep the existing **Duracell Energy Cloud** entry under Devices & services. Deleting it can remove entity settings and break dashboard references.
 3. Add the published repository to HACS as an Integration custom repository, then download the latest release. HACS should replace the files in the same domain folder.
 4. If HACS refuses because the folder already exists, stop Home Assistant, move only that integration's code folder outside `custom_components`, start Home Assistant, install using HACS and restart again. Temporary unavailable sensors during this operation are expected.
-5. Confirm the loaded version is 0.6.0 in the integration's diagnostics/system information and the original entities still update. Two built-in battery energy entities should appear (14 entities in total). When upgrading from v0.3.0, the charging/discharging power and activity entities are also new.
+5. Confirm the loaded version is 0.7.0 in the integration's diagnostics/system information and the original entities still update. The original sensors remain, with new energy, health and detail entities added. Some reported counters are disabled by default. When upgrading from v0.3.0, the charging/discharging power and activity entities are also new.
 6. Check charge/discharge direction against the Duracell portal and keep the backup until verified.
 
 For Synology Container Manager, `config` above means the host directory mounted at `/config` inside the Home Assistant container. Restart the Home Assistant container; do not remove the container's persistent configuration volume.
